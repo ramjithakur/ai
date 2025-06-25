@@ -1,0 +1,289 @@
+{
+  "name": "My workflow 3",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "2b8c0281-1ac1-452e-af7a-68ce3d764da7",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -280,
+        -720
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://cointelegraph.com/rss/tag/bitcoin",
+        "options": {}
+      },
+      "id": "e028f704-98d7-442a-98ac-c0ae7688bb47",
+      "name": "Get RSS Feed",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        40,
+        -720
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract data from RSS feed\nconst articles = $input.all();\nlet combinedText = '';\n// Take top 3-5 articles for context\nconst latestArticles = articles.slice(0, 4);\n\nlatestArticles.forEach((item, index) => {\n  const content = item.json.content || item.json.description || '';\n  // Strip HTML tags for cleaner text\n  const plainText = content.replace(/<[^>]*>?/gm, '');\n  combinedText += `ARTICLE ${index + 1} TITLE: ${item.json.title}\\n`;\n  combinedText += `DATE: ${item.json.pubDate || 'N/A'}\\n`;\n  combinedText += `LINK: ${item.json.link || 'N/A'}\\n`;\n  combinedText += `CONTENT: ${plainText.substring(0, 600)}...\\n\\n`;\n});\n\n// Return the combined text in a structured way\nreturn { json: { rssContent: combinedText } };"
+      },
+      "id": "0df0b524-2772-4318-81a5-288001a7f787",
+      "name": "Process RSS Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        360,
+        -720
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-1.5-flash-latest",
+        "options": {}
+      },
+      "id": "57078fff-3848-4124-84ef-0ac37e6762b8",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        20,
+        -100
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "JSuyZ37jv7UJU6LF",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.rssContent }}",
+        "options": {
+          "systemMessage": "You are an expert SEO copywriter. Your task is to write a high-quality, human-like blog article in US English based on the provided RSS content.\n\nFollow these rules:\n- The article must have a clear structure: introduction, key points, analysis, and a conclusion.\n- Wrap the main title in <h1><strong>...</strong></h1> tags.\n- Wrap all main headings in <h2><strong>...</strong></h2> tags.\n- Wrap all subheadings in <h3><strong>...</strong></h3> tags.\n- Write in a conversational, engaging tone.\n- The entire output should be only the article's HTML content.\n\nIMPORTANT: DO NOT include any <style> tags, CSS code, or JSON-LD <script> tags in your output. Only generate the article's HTML starting from <h1>."
+        }
+      },
+      "id": "e626f9b0-e405-4a6b-9fef-6567b2af7b66",
+      "name": "AI - Article Generator",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        -300,
+        -460
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('AI - Article Generator').item.json.output }}",
+        "options": {
+          "systemMessage": "You are a concise title generator for SEO-friendly US blog posts. Based on the article HTML, produce:\n\n- A single title of 50–60 characters, capturing the main topic.\n- No HTML tags.\n- Use US English spelling.\n- Output only the title text."
+        }
+      },
+      "id": "06c0b1e6-f422-4b14-a2a5-476ae037fb27",
+      "name": "AI - Title Generator",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        260,
+        -460
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('AI - Article Generator').item.json.output }}",
+        "options": {
+          "systemMessage": "You are an expert JSON-LD Schema generator for SEO. Based on the provided HTML article, create a complete and valid JSON-LD schema.\n\nYour output MUST include:\n1. Article schema.\n2. BreadcrumbList schema.\n3. FAQPage schema (if relevant questions can be derived from the text).\n\nCRITICAL: Output ONLY the raw JSON array. Do not wrap it in <script> tags. Do not add any other text or explanation. Your entire output should start with `[` and end with `]`."
+        }
+      },
+      "id": "4ee1b96c-1e9d-4ad3-8af5-0a7feb94d5da",
+      "name": "AI - Schema Generator",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        -340,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.pexels.com/v1/search?per_page=1&orientation=landscape",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "={{ $('AI - Title Generator').item.json.output }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "qbxn91DGHfA95dI7XrV4KJEpDmr5NDUJ3FtvVOsXmfdp3100a4XlGOQK"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c5c4874b-cd06-4a48-8894-6b5e61a068bd",
+      "name": "Pexels - Get Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        340,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "title": "={{ $('AI - Title Generator').item.json.output }}",
+        "additionalFields": {
+          "content": "=<!-- Image with Inline CSS for Overlay -->\n<div style=\"position: relative; width: 100%; max-width: 800px; margin: 0 auto 25px auto; border-radius: 8px; overflow: hidden;\">\n  <img src=\"{{ $('Pexels - Get Image').item.json.photos?.[0]?.src?.landscape ?? 'https://www.your-website.com/default-blog-image.jpg' }}\" alt=\"{{ $('AI - Title Generator').item.json.output }}\" style=\"width:100%; display:block;\">\n  <div style=\"position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to top, rgba(0,0,0,0.7), rgba(0,0,0,0.1)); color: white; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; padding: 30px; text-align: left; box-sizing: border-box;\">\n    <h1 style=\"font-size: 2.2em; font-weight: bold; margin: 0; line-height: 1.2; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); color: white;\"><strong>{{ $('AI - Title Generator').item.json.output }}</strong></h1>\n  </div>\n</div>\n\n<!-- Article Content from AI - Article Generator -->\n{{ $('AI - Article Generator').item.json.output.replace(/<h1>.*?<\\/h1>/, '') }}",
+          "status": "publish"
+        }
+      },
+      "id": "be19c44a-9e71-46df-afbb-b27289bc6217",
+      "name": "WordPress - Create Post",
+      "type": "n8n-nodes-base.wordpress",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        180
+      ],
+      "credentials": {
+        "wordpressApi": {
+          "id": "LeLSUToGv4RajrP2",
+          "name": "Wordpress account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get RSS Feed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get RSS Feed": {
+      "main": [
+        [
+          {
+            "node": "Process RSS Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process RSS Content": {
+      "main": [
+        [
+          {
+            "node": "AI - Article Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI - Article Generator",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "AI - Title Generator",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "AI - Schema Generator",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI - Article Generator": {
+      "main": [
+        [
+          {
+            "node": "AI - Title Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI - Title Generator": {
+      "main": [
+        [
+          {
+            "node": "AI - Schema Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI - Schema Generator": {
+      "main": [
+        [
+          {
+            "node": "Pexels - Get Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pexels - Get Image": {
+      "main": [
+        [
+          {
+            "node": "WordPress - Create Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "9687f5d9-b675-41c2-9600-4fff2a1eb17d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b76d870d908423f00a126099fbfc078bf0b186568b98a433f6973e1ecb59f2b2"
+  },
+  "id": "HLLLQ3HHsViyBZHT",
+  "tags": []
+}
